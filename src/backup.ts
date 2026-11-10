@@ -1,4 +1,5 @@
 import { type MindMap, sanitizeMap } from './model';
+import { type Note, listNotes, restoreNotes } from './notes';
 import { downloadFile, listMaps, onStorageChange, restoreMaps } from './storage';
 
 // Backup/Restore in ein vom Nutzer gewähltes Verzeichnis (File System Access API, Chrome/Edge am PC).
@@ -76,10 +77,11 @@ export interface BackupFile {
   version: 1;
   createdAt: number;
   maps: MindMap[];
+  notes?: Note[];
 }
 
 export function makeBackup(): BackupFile {
-  return { format: 'meinmap-backup', version: 1, createdAt: Date.now(), maps: listMaps() };
+  return { format: 'meinmap-backup', version: 1, createdAt: Date.now(), maps: listMaps(), notes: listNotes() };
 }
 
 export function parseBackup(text: string): MindMap[] {
@@ -87,6 +89,14 @@ export function parseBackup(text: string): MindMap[] {
   if (j.format === 'meinmap-backup' && Array.isArray(j.maps)) return j.maps.map((m) => sanitizeMap(m));
   if (j.nodes && j.roots) return [sanitizeMap(j)]; // einzelne exportierte Mindmap
   throw new Error('Keine meinMap-Sicherung');
+}
+
+/** Spielt ein Backup (Text) ein: Mindmaps + Notizen. Gibt die Anzahl Mindmaps zurück. */
+export function applyBackupText(text: string): number {
+  const maps = parseBackup(text);
+  const n = restoreMaps(maps);
+  try { restoreNotes((JSON.parse(text) as Partial<BackupFile>).notes); } catch { /* ignore */ }
+  return n;
 }
 
 const stamp = (d = new Date()) =>
@@ -123,11 +133,11 @@ export async function backupToDir(dir: DirHandle): Promise<string> {
 
 export async function restoreFromDir(dir: DirHandle, name: string): Promise<number> {
   const f = await (await dir.getFileHandle(name)).getFile();
-  return restoreMaps(parseBackup(await f.text()));
+  return applyBackupText(await f.text());
 }
 
 export async function restoreFromFile(file: File): Promise<number> {
-  return restoreMaps(parseBackup(await file.text()));
+  return applyBackupText(await file.text());
 }
 
 /** Fallback ohne Verzeichniswahl: Teilen-Dialog (Android) oder Download. */

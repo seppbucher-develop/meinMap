@@ -1,11 +1,11 @@
 import {
   backupAsFile, backupToDir, chooseDir, dirPickerSupported, getDir, hasPermission, isAutoBackup,
-  listBackups, makeBackup, parseBackup, restoreFromDir, restoreFromFile, setAutoBackup,
+  applyBackupText, listBackups, makeBackup, restoreFromDir, restoreFromFile, setAutoBackup,
 } from './backup';
 import { copyText, esc, modal, toast } from './dialogs';
 import type { MindMap } from './model';
 import { FORMAT_HELP, IMAGE_PROMPT, aiPackage, mapFromOutline, parseOutline, toOutline } from './outline';
-import { downloadFile, exportMap, importMap, restoreMaps, safeName, saveMap } from './storage';
+import { downloadFile, exportMap, importMap, safeName, saveMap } from './storage';
 import { getApiKey, imageToOutline, setApiKey } from './vision';
 
 const q = <T extends Element>(root: Element, s: string) => root.querySelector(s) as T;
@@ -74,7 +74,7 @@ export function importDialog(onDone: (mapId: string | null) => void) {
       if (text.trimStart().startsWith('{')) {
         const j = JSON.parse(text);
         if (j.format === 'meinmap-backup') {
-          const n = restoreMaps(parseBackup(text));
+          const n = applyBackupText(text);
           toast(`${n} Mindmap(s) aus der Sicherung wiederhergestellt`);
           return finish(null);
         }

@@ -72,7 +72,7 @@ body {
 .btn.danger { color: var(--danger); }
 
 /* ── Liste ── */
-.list { max-width: 640px; margin: 0 auto; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); }
+.list { max-width: 640px; min-height: 100dvh; display: flex; flex-direction: column; margin: 0 auto; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); }
 .list h1 { margin: 0 0 16px; }
 .list form.new { display: flex; gap: 8px; margin-bottom: 20px; }
 .list form.new input { flex: 1; min-width: 0; font: inherit; padding: 0 12px; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
@@ -197,3 +197,16 @@ body {
 kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; font-size: 12px; }
 .toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: #1f2937; color: #fff; padding: 10px 16px; border-radius: 12px; opacity: 0; pointer-events: none; transition: .2s; z-index: 60; max-width: 90vw; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ── Notizen & Version ── */
+.notes { margin-top: 28px; }
+.notes h2 { font-size: 16px; margin: 0 0 8px; }
+.note-new { display: flex; gap: 8px; margin-bottom: 8px; }
+.note-new input { flex: 1; min-width: 0; font: inherit; padding: 0 12px; min-height: 42px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+.note-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.note-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); background: var(--panel); border-radius: 10px; }
+.note-list label { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; cursor: pointer; padding: 4px 0; }
+.note-list input[type=checkbox] { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--accent); flex: none; }
+.note-list span { overflow-wrap: anywhere; }
+.note-list li.done span { text-decoration: line-through; color: var(--muted); }
+.version { margin-top: auto; padding-top: 32px; text-align: center; color: var(--muted); font-size: 12px; }

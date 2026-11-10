@@ -3,6 +3,7 @@ import { Editor } from './editor';
 import { createMap, type MindMap } from './model';
 import { startAutoBackup } from './backup';
 import { esc } from './dialogs';
+import { addNote, listNotes, saveNotes } from './notes';
 import { backupDialog, importDialog } from './panels';
 import { deleteMap, getMap, listMaps, saveMap } from './storage';
 
@@ -53,6 +54,24 @@ function showList() {
         <button class="btn" data-import>⤒ Importieren (Datei, Text, Screenshot)</button>
         <button class="btn" data-backup>💾 Backup &amp; Wiederherstellen</button>
       </div>
+      <section class="notes">
+        <h2>Gedanken zur App</h2>
+        <form class="note-new" autocomplete="off">
+          <input name="note" placeholder="Idee, Fehler oder Wunsch notieren …" maxlength="300" aria-label="Neue Notiz">
+          <button class="btn" type="submit">＋</button>
+        </form>
+        <ul class="note-list">
+          ${listNotes()
+            .map(
+              (n) => `<li class="${n.done ? 'done' : ''}">
+                <label><input type="checkbox" data-note="${esc(n.id)}" ${n.done ? 'checked' : ''}><span>${esc(n.text)}</span></label>
+                <button class="btn small" data-note-del="${esc(n.id)}" aria-label="Notiz löschen">×</button>
+              </li>`,
+            )
+            .join('')}
+        </ul>
+      </section>
+      <footer class="version">meinMap v${__APP_VERSION__} · Stand ${__BUILD_DATE__}</footer>
     </main>`;
 
   app.querySelector<HTMLFormElement>('form.new')!.addEventListener('submit', (e) => {
@@ -69,6 +88,26 @@ function showList() {
         deleteMap(m.id);
         showList();
       }
+    }),
+  );
+  app.querySelector<HTMLFormElement>('form.note-new')!.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = (e.target as HTMLFormElement).elements.namedItem('note') as HTMLInputElement;
+    const text = input.value.trim();
+    if (!text) return;
+    addNote(text);
+    showList();
+  });
+  app.querySelectorAll<HTMLInputElement>('[data-note]').forEach((c) =>
+    c.addEventListener('change', () => {
+      saveNotes(listNotes().map((n) => (n.id === c.dataset.note ? { ...n, done: c.checked } : n)));
+      c.closest('li')!.classList.toggle('done', c.checked);
+    }),
+  );
+  app.querySelectorAll<HTMLButtonElement>('[data-note-del]').forEach((b) =>
+    b.addEventListener('click', () => {
+      saveNotes(listNotes().filter((n) => n.id !== b.dataset.noteDel));
+      showList();
     }),
   );
   app.querySelector('[data-import]')!.addEventListener('click', () =>
