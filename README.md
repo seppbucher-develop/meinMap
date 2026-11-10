@@ -69,6 +69,6 @@ Stack: TypeScript, Vite, SVG (ohne UI-Framework). Aufbau: `src/model.ts` (Daten 
 ## Installation auf dem Handy
 
 Die App wird per GitHub Actions (`.github/workflows/deploy.yml`) auf GitHub Pages veröffentlicht – bei jedem Push
-auf `main` (oder manuell über „Run workflow“). Einmalig im Repository unter *Settings → Pages → Source* **GitHub Actions**
+auf `master` (oder manuell über „Run workflow“). Einmalig im Repository unter *Settings → Pages → Source* **GitHub Actions**
 wählen. Dann die Seite in Chrome auf
 Android öffnen und „Zur Startseite hinzufügen“ bzw. „App installieren“ wählen. Danach läuft sie auch offline.
