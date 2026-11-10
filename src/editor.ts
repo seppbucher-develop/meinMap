@@ -9,12 +9,14 @@ const HUES = [210, 150, 28, 280, 350, 180, 52, 320];
 const DRAG_THRESHOLD = 5; // px
 const LONG_PRESS_MS = 380;
 const DOUBLE_TAP_MS = 350;
+const FREE_DISTANCE_PX = 180; // so weit über die bisherige Entfernung hinaus lösen sich Knoten vom Elternknoten
 const MIN_K = 0.15;
 const MAX_K = 3;
 
 type Target =
   | { kind: 'node'; id: string; mode: DropMode }
   | { kind: 'free' }
+  | { kind: 'stay' }
   | null;
 
 interface DragState {
@@ -741,7 +743,19 @@ export class Editor {
         if (!best || dist < best.dist) best = { id, dist };
       }
     }
-    if (!best) return { kind: 'free' };
+    if (!best) {
+      // Ein Knoten mit Elternknoten wird nur dann zum freien Knoten, wenn er deutlich
+      // (mind. ~180 px Bildschirmabstand über die ursprüngliche Entfernung hinaus) vom Elternknoten weggezogen wird.
+      const parentId = this.map.nodes[d.id].parent;
+      if (parentId !== null) {
+        const pb = this.boxes[parentId];
+        const ob = this.boxes[d.id];
+        const orig = Math.hypot(ob.x - pb.x, ob.y - pb.y);
+        const far = Math.hypot(wx - d.ox - pb.x, wy - d.oy - pb.y);
+        if (far < orig + FREE_DISTANCE_PX / this.view.k) return { kind: 'stay' };
+      }
+      return { kind: 'free' };
+    }
     const b = this.boxes[best.id];
     const hasParent = this.map.nodes[best.id].parent !== null;
     let mode: DropMode = 'child';
@@ -784,6 +798,10 @@ export class Editor {
         this.dashedLink(tb.x, by, gx, gy);
         label = (t.mode === 'before' ? 'Vor „' : 'Nach „') + tname + '“ einfügen';
       }
+    } else if (t?.kind === 'stay') {
+      const pb = this.boxes[this.map.nodes[d.id].parent!];
+      this.dashedLink(pb.x, pb.y, gx, gy);
+      label = 'Bleibt am Platz (weiter ziehen zum Lösen)';
     } else if (t?.kind === 'free') {
       label = this.map.nodes[d.id].parent === null ? '' : 'Als freien Knoten ablegen';
     } else {
@@ -820,7 +838,7 @@ export class Editor {
     this.drag = null;
     if (!d) return;
     const t = d.target;
-    if (apply && t) {
+    if (apply && t && t.kind !== 'stay') {
       const id = d.id;
       const gx = d.wx - d.ox;
       const gy = d.wy - d.oy;
