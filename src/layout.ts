@@ -49,8 +49,19 @@ export function layoutMap(map: MindMap): Record<string, Box> {
     const ry = root.y ?? 0;
     if (map.layout === 'radial') layoutRadial(map, rootId, rx, ry, boxes, size, leaves);
     else layoutTree(map, rootId, rx, ry, boxes, size);
+    applyOffsets(map, rootId, 0, 0, boxes);
   }
   return boxes;
+}
+
+/** Manuelle Verschiebungen (dx/dy) wirken kumulativ auf den Knoten und seinen ganzen Teilbaum. */
+function applyOffsets(map: MindMap, id: string, cx: number, cy: number, boxes: Record<string, Box>) {
+  const n = map.nodes[id];
+  const ox = cx + (n.parent === null ? 0 : n.dx ?? 0);
+  const oy = cy + (n.parent === null ? 0 : n.dy ?? 0);
+  boxes[id].x += ox;
+  boxes[id].y += oy;
+  for (const c of n.children) applyOffsets(map, c, ox, oy, boxes);
 }
 
 function layoutRadial(

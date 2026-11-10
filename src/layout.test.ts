@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { layoutMap } from './layout';
-import { addChild, addFree, createMap } from './model';
+import { addChild, addFree, createMap, shiftNode } from './model';
 
 describe('Layout', () => {
   it('radial: Kinder liegen im gleichen Abstand um die Wurzel', () => {
@@ -29,5 +29,18 @@ describe('Layout', () => {
     const f = addFree(m, 500, -300, 'Frei');
     const b = layoutMap(m);
     expect(b[f]).toMatchObject({ x: 500, y: -300 });
+  });
+
+  it('manuelle Verschiebung wirkt auch auf den Teilbaum', () => {
+    const m = createMap('R');
+    const r = m.roots[0];
+    const a = addChild(m, r, 'A');
+    const a1 = addChild(m, a, 'A1');
+    const before = layoutMap(m);
+    shiftNode(m, a, 40, -25);
+    const after = layoutMap(m);
+    expect(after[a].x - before[a].x).toBeCloseTo(40);
+    expect(after[a1].y - before[a1].y).toBeCloseTo(-25);
+    expect(after[r]).toMatchObject({ x: before[r].x, y: before[r].y });
   });
 });

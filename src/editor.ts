@@ -9,14 +9,12 @@ const HUES = [210, 150, 28, 280, 350, 180, 52, 320];
 const DRAG_THRESHOLD = 5; // px
 const LONG_PRESS_MS = 380;
 const DOUBLE_TAP_MS = 350;
-const FREE_DISTANCE_PX = 180; // so weit über die bisherige Entfernung hinaus lösen sich Knoten vom Elternknoten
 const MIN_K = 0.15;
 const MAX_K = 3;
 
 type Target =
   | { kind: 'node'; id: string; mode: DropMode }
-  | { kind: 'free' }
-  | { kind: 'stay' }
+  | { kind: 'move' }
   | null;
 
 interface DragState {
@@ -28,6 +26,10 @@ interface DragState {
   wy: number;
   target: Target;
   dim: Set<string>;
+  /** Zustand bei Drag-Beginn – Trefferprüfung läuft immer dagegen, auch während die Vorschau eine andere Anordnung zeigt. */
+  baseMap: MindMap;
+  baseBoxes: Record<string, Box>;
+  previewKey: string;
 }
 
 type Gesture =
@@ -126,6 +128,7 @@ export class Editor {
           <button class="btn" data-type="info" title="Info (zählt als erledigt)">ⓘ Info</button>
         </div>
         <button class="btn" data-act="edit">✎ Text</button>
+        <button class="btn" data-act="resetpos" title="Knoten wieder an den automatischen Platz setzen">↺ Position</button>
         <button class="btn" data-act="detach" title="Vom Elternknoten lösen (freier Knoten)">⛓ Lösen</button>
         <button class="btn danger" data-act="delete">🗑 Löschen</button>
       </footer>`;
@@ -157,7 +160,11 @@ export class Editor {
         case 'fit': return this.fit();
         case 'export': return shareDialog(() => this.map, (t) => this.applyOutlineText(t));
         case 'layout':
-          return this.commit((m) => (m.layout = m.layout === 'radial' ? 'tree' : 'radial'), true);
+          return this.commit((m) => {
+            m.layout = m.layout === 'radial' ? 'tree' : 'radial';
+            M.resetAllOffsets(m); // manuelle Positionen gelten nur für das jeweilige Layout
+          }, true);
+        case 'resetpos': return this.sel && this.commit((m) => M.resetOffset(m, this.sel!));
         case 'free': return this.addFreeNode();
         case 'sibling': return this.addSiblingNode();
         case 'child': return this.addChildNode();
@@ -310,7 +317,8 @@ export class Editor {
     this.gNodes.replaceChildren();
     this.gOverlay.replaceChildren();
 
-    const dim = this.drag?.dim;
+    // Während einer Andock-Vorschau zeigt die Ansicht die hypothetische Anordnung; sonst wird der Ursprungsort abgeblendet.
+    const dim = this.drag && this.drag.target?.kind !== 'node' ? this.drag.dim : undefined;
     for (const id of Object.keys(this.map.nodes)) {
       const n = this.map.nodes[id];
       if (n.parent) this.drawEdge(n.parent, id, dim?.has(id) ?? false);
@@ -348,9 +356,10 @@ export class Editor {
       if (ul < 1) { ux = dx / len; uy = dy / len; } else { ux /= ul; uy /= ul; }
       d = `M${p.x} ${p.y} Q${p.x + ux * len * 0.4} ${p.y + uy * len * 0.4} ${c.x} ${c.y}`;
     }
+    const previewing = this.drag?.target?.kind === 'node' && this.drag.id === cid;
     svg('path', {
       d,
-      class: 'edge' + (dim ? ' dim' : ''),
+      class: 'edge' + (dim ? ' dim' : '') + (previewing ? ' preview' : ''),
       stroke: color,
       'stroke-width': Math.max(1.8, 4.5 - c.depth),
     }, this.gEdges);
@@ -372,6 +381,7 @@ export class Editor {
     if (isRoot) cls.push('root');
     if (id === this.sel && into === this.gNodes) cls.push('selected');
     if (dim) cls.push('dim');
+    if (!at && this.drag?.target?.kind === 'node' && this.drag.id === id) cls.push('preview');
     if (n.type !== 'none' && done) cls.push('done');
     const cx = at ? at.x : b.x;
     const cy = at ? at.y : b.y;
@@ -412,6 +422,7 @@ export class Editor {
       const act = b.dataset.act;
       b.disabled = !has;
       if (act === 'detach') b.disabled = !node || node.parent === null;
+      if (act === 'resetpos') b.disabled = !this.sel || !M.hasOffset(this.map, this.sel);
       if (b.dataset.type) b.classList.toggle('active', node?.type === b.dataset.type);
     });
     const layoutBtn = this.root.querySelector<HTMLButtonElement>('[data-act="layout"]')!;
@@ -716,11 +727,14 @@ export class Editor {
       oy: w.y - b.y,
       wx: w.x,
       wy: w.y,
-      target: null,
+      target: { kind: 'move' },
       dim: new Set(M.subtreeIds(this.map, id)),
+      baseMap: this.map,
+      baseBoxes: this.boxes,
+      previewKey: 'move',
     };
     this.gesture = { kind: 'drag' };
-    this.render(); // blendet Teilbaum aus und zeichnet Overlay
+    this.render(); // blendet den Ursprungsort aus und zeichnet das Overlay
   }
 
   private updateDrag(sx: number, sy: number) {
@@ -729,42 +743,47 @@ export class Editor {
     const w = this.screenToWorld(sx, sy);
     d.wx = w.x;
     d.wy = w.y;
-    d.target = this.findTarget(d, w.x, w.y);
-    this.drawOverlay();
+    d.target = this.findTarget(d, w.x - d.ox, w.y - d.oy);
+    const key = d.target?.kind === 'node' ? `node:${d.target.id}:${d.target.mode}` : d.target ? 'move' : 'invalid';
+    if (key !== d.previewKey) {
+      d.previewKey = key;
+      // Andocken grafisch simulieren: hypothetische Anordnung anzeigen, bis losgelassen wird.
+      if (d.target?.kind === 'node') {
+        const hypo = M.cloneMap(d.baseMap);
+        M.moveNode(hypo, d.id, d.target.id, d.target.mode);
+        this.map = hypo;
+      } else {
+        this.map = d.baseMap;
+      }
+      this.render();
+    } else {
+      this.drawOverlay();
+    }
   }
 
-  private findTarget(d: DragState, wx: number, wy: number): Target {
+  /**
+   * Ziel bestimmen. `gx, gy` ist die Mitte des gezogenen Knotens. Angedockt wird nur, wenn diese Mitte
+   * deutlich (innerhalb des Rahmens) über einem anderen Knoten liegt; sonst wird der Knoten nur grafisch verschoben.
+   */
+  private findTarget(d: DragState, gx: number, gy: number): Target {
     let best: { id: string; dist: number } | null = null;
-    const pad = 10 / this.view.k;
-    for (const [id, b] of Object.entries(this.boxes)) {
+    for (const [id, b] of Object.entries(d.baseBoxes)) {
       if (d.dim.has(id)) continue;
-      if (Math.abs(wx - b.x) <= b.w / 2 + pad && Math.abs(wy - b.y) <= b.h / 2 + pad) {
-        const dist = Math.hypot(wx - b.x, wy - b.y);
+      if (Math.abs(gx - b.x) <= b.w / 2 && Math.abs(gy - b.y) <= b.h / 2) {
+        const dist = Math.hypot(gx - b.x, gy - b.y);
         if (!best || dist < best.dist) best = { id, dist };
       }
     }
-    if (!best) {
-      // Ein Knoten mit Elternknoten wird nur dann zum freien Knoten, wenn er deutlich
-      // (mind. ~180 px Bildschirmabstand über die ursprüngliche Entfernung hinaus) vom Elternknoten weggezogen wird.
-      const parentId = this.map.nodes[d.id].parent;
-      if (parentId !== null) {
-        const pb = this.boxes[parentId];
-        const ob = this.boxes[d.id];
-        const orig = Math.hypot(ob.x - pb.x, ob.y - pb.y);
-        const far = Math.hypot(wx - d.ox - pb.x, wy - d.oy - pb.y);
-        if (far < orig + FREE_DISTANCE_PX / this.view.k) return { kind: 'stay' };
-      }
-      return { kind: 'free' };
-    }
-    const b = this.boxes[best.id];
-    const hasParent = this.map.nodes[best.id].parent !== null;
+    if (!best) return { kind: 'move' };
+    const b = d.baseBoxes[best.id];
+    const hasParent = d.baseMap.nodes[best.id].parent !== null;
     let mode: DropMode = 'child';
     if (hasParent) {
-      const rel = (wy - (b.y - b.h / 2)) / b.h;
-      if (rel < 0.3) mode = 'before';
-      else if (rel > 0.7) mode = 'after';
+      const rel = (gy - (b.y - b.h / 2)) / b.h;
+      if (rel < 0.25) mode = 'before';
+      else if (rel > 0.75) mode = 'after';
     }
-    if (!M.canMove(this.map, d.id, best.id, mode)) return null;
+    if (!M.canMove(d.baseMap, d.id, best.id, mode)) return null;
     return { kind: 'node', id: best.id, mode };
   }
 
@@ -781,35 +800,35 @@ export class Editor {
       const tb = this.boxes[t.id];
       const tn = this.map.nodes[t.id];
       const tname = displayText(tn.text);
+      const mb = this.boxes[d.id]; // Position des angedockten Knotens in der Vorschau
+      svg('rect', {
+        class: 'drop-hl', x: tb.x - tb.w / 2 - 5, y: tb.y - tb.h / 2 - 5,
+        width: tb.w + 10, height: tb.h + 10, rx: tb.h / 2 + 5,
+      }, this.gOverlay);
       if (t.mode === 'child') {
-        svg('rect', {
-          class: 'drop-hl', x: tb.x - tb.w / 2 - 5, y: tb.y - tb.h / 2 - 5,
-          width: tb.w + 10, height: tb.h + 10, rx: tb.h / 2 + 5,
-        }, this.gOverlay);
-        this.dashedLink(tb.x, tb.y, gx, gy);
-        label = `Unterknoten von „${tname}“`;
+        label = this.map.nodes[d.id].parent === t.id && d.baseMap.nodes[d.id].parent === t.id
+          ? `Zurück an den Platz bei „${tname}“`
+          : `Andocken als Unterknoten von „${tname}“`;
       } else {
-        const by = t.mode === 'before' ? tb.y - tb.h / 2 - 6 : tb.y + tb.h / 2 + 6;
-        svg('line', {
-          class: 'drop-bar', x1: tb.x - tb.w / 2 - 4, x2: tb.x + tb.w / 2 + 4, y1: by, y2: by,
-        }, this.gOverlay);
-        const pb = this.boxes[tn.parent!];
-        this.dashedLink(pb.x, pb.y, tb.x, by);
-        this.dashedLink(tb.x, by, gx, gy);
         label = (t.mode === 'before' ? 'Vor „' : 'Nach „') + tname + '“ einfügen';
       }
-    } else if (t?.kind === 'stay') {
-      const pb = this.boxes[this.map.nodes[d.id].parent!];
-      this.dashedLink(pb.x, pb.y, gx, gy);
-      label = 'Bleibt am Platz (weiter ziehen zum Lösen)';
-    } else if (t?.kind === 'free') {
-      label = this.map.nodes[d.id].parent === null ? '' : 'Als freien Knoten ablegen';
+      svg('rect', {
+        class: 'drop-hl', x: mb.x - mb.w / 2 - 4, y: mb.y - mb.h / 2 - 4,
+        width: mb.w + 8, height: mb.h + 8, rx: mb.h / 2 + 4,
+      }, this.gOverlay);
+    } else if (t?.kind === 'move') {
+      // Beziehung bleibt erhalten: Linie zum Elternknoten zeigt, dass der Knoten verbunden bleibt.
+      const pid = this.map.nodes[d.id].parent;
+      if (pid) {
+        const pb = this.boxes[pid];
+        this.dashedLink(pb.x, pb.y, gx, gy);
+      }
     } else {
       label = 'Hier nicht möglich';
     }
 
-    // Geist des gezogenen Knotens
-    const gg = svg('g', { class: 'ghost' + (t === null ? ' invalid' : '') }, this.gOverlay);
+    // Geist des gezogenen Knotens (folgt dem Zeiger)
+    const gg = svg('g', { class: 'ghost' + (t === null ? ' invalid' : '') + (t?.kind === 'node' ? ' docking' : '') }, this.gOverlay);
     this.drawNode(d.id, false, gg, { x: gx, y: gy });
     const count = d.dim.size - 1;
     if (count > 0) {
@@ -837,18 +856,21 @@ export class Editor {
     const d = this.drag;
     this.drag = null;
     if (!d) return;
+    this.map = d.baseMap; // Vorschau-Anordnung verwerfen
     const t = d.target;
-    if (apply && t && t.kind !== 'stay') {
+    if (apply && t) {
       const id = d.id;
-      const gx = d.wx - d.ox;
-      const gy = d.wy - d.oy;
       if (t.kind === 'node') {
         this.commit((m) => M.moveNode(m, id, t.id, t.mode));
         this.ensureVisible(id);
         return;
       }
-      // freier Knoten: Wurzel verschieben bzw. Knoten lösen
-      this.commit((m) => M.detachToFree(m, id, gx, gy));
+      // Nur grafisch verschieben: Differenz zwischen Ablageort und bisheriger Position
+      const b = d.baseBoxes[id];
+      const ddx = d.wx - d.ox - b.x;
+      const ddy = d.wy - d.oy - b.y;
+      if (Math.hypot(ddx, ddy) > 0.5) this.commit((m) => M.shiftNode(m, id, ddx, ddy));
+      else this.render();
       return;
     }
     this.render();
