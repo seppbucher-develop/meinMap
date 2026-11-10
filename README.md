@@ -19,6 +19,21 @@ nutzen und als App installieren lässt. Alle Daten bleiben lokal im Gerät.
 - Layout: **Radial** (um die Wurzel herum) oder **Baum** (von links nach rechts)
 - Rückgängig/Wiederholen, Zoom (Mausrad, Pinch), Verschieben der Fläche
 
+### Import, Export, KI
+
+- **Import** (Startseite): meinMap-Datei, Sicherung, Gliederung (.md/.txt), eingefügter Text oder **Screenshot**.
+  Screenshots werden per Claude-API erkannt (API-Schlüssel wird nur im Browser gespeichert; Bild per `Strg+V`
+  einfügen oder Datei wählen). Das Ergebnis wird erst als Gliederung angezeigt und kann vor dem Import korrigiert
+  werden. Ohne Schlüssel: Prompt kopieren, mit dem Screenshot in Claude.ai senden, Antwort einfügen.
+- **Export & KI** (Editor, Symbol ⇅): `.json`, **KI-Paket** (`.md` mit Regeln + Gliederung, als Wissen für ein
+  Claude-Projekt bzw. Gem) oder Gliederung in die Zwischenablage. Die geänderte Gliederung der KI lässt sich über
+  „Änderungen aus Text übernehmen“ wieder einspielen (rückgängig machbar).
+- **Gliederungsformat:** `- Text`, `- [ ] offen`, `- [x] erledigt`, `- [i] Info`; Einrückung = Unterknoten,
+  mehrere Zeilen ganz links = freie Knoten.
+- **Backup & Wiederherstellen** (Startseite): Verzeichnis frei wählbar (Chrome/Edge am PC), Backup jetzt,
+  automatisches Backup (`meinmap-latest.json`), Wiederherstellen aus einer Liste der Backups im Verzeichnis.
+  Auf Android (kein Verzeichnis-Dialog im Browser): Backup-Datei teilen/herunterladen und aus Datei wiederherstellen.
+
 ### Done-Logik
 
 - `Info` zählt immer als erledigt (`done = true`).
@@ -53,5 +68,7 @@ Stack: TypeScript, Vite, SVG (ohne UI-Framework). Aufbau: `src/model.ts` (Daten 
 
 ## Installation auf dem Handy
 
-Die gebaute App (`dist/`) auf einem HTTPS-Server bereitstellen (z. B. GitHub Pages), in Chrome auf
+Die App wird per GitHub Actions (`.github/workflows/deploy.yml`) auf GitHub Pages veröffentlicht – bei jedem Push
+auf `main` (oder manuell über „Run workflow“). Einmalig im Repository unter *Settings → Pages → Source* **GitHub Actions**
+wählen. Dann die Seite in Chrome auf
 Android öffnen und „Zur Startseite hinzufügen“ bzw. „App installieren“ wählen. Danach läuft sie auch offline.

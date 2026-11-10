@@ -19,10 +19,17 @@ function readAll(): MindMap[] {
 function writeAll(maps: MindMap[]): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(maps));
+    listeners.forEach((f) => f());
   } catch (e) {
     console.error('Speichern fehlgeschlagen', e);
     alert('Speichern fehlgeschlagen (Speicher voll?). Bitte die Mindmap exportieren.');
   }
+}
+
+const listeners: Array<() => void> = [];
+/** Wird nach jeder Änderung der gespeicherten Mindmaps aufgerufen (z. B. für Auto-Backup). */
+export function onStorageChange(fn: () => void): void {
+  listeners.push(fn);
 }
 
 export function listMaps(): MindMap[] {
@@ -54,11 +61,32 @@ export function importMap(text: string): MindMap {
   return map;
 }
 
-export function exportMap(map: MindMap): void {
-  const blob = new Blob([JSON.stringify(map, null, 2)], { type: 'application/json' });
+export function downloadFile(name: string, content: string | Blob, type = 'application/json'): void {
+  const blob = content instanceof Blob ? content : new Blob([content], { type });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${map.title.replace(/[^\w\- äöüÄÖÜß]+/g, '_') || 'mindmap'}.meinmap.json`;
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+export function safeName(title: string): string {
+  return title.replace(/[^\w\- äöüÄÖÜß]+/g, '_').trim() || 'mindmap';
+}
+
+export function exportMap(map: MindMap): void {
+  downloadFile(`${safeName(map.title)}.meinmap.json`, JSON.stringify(map, null, 2));
+}
+
+/** Ersetzt/ergänzt mehrere Mindmaps (Restore). Gleiche IDs werden überschrieben. */
+export function restoreMaps(maps: MindMap[]): number {
+  const all = readAll();
+  for (const raw of maps) {
+    const m = sanitizeMap(raw);
+    const i = all.findIndex((x) => x.id === m.id);
+    if (i >= 0) all[i] = m;
+    else all.push(m);
+  }
+  writeAll(all);
+  return maps.length;
 }

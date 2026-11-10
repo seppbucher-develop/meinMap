@@ -1,7 +1,10 @@
 import './style.css';
 import { Editor } from './editor';
 import { createMap, type MindMap } from './model';
-import { deleteMap, getMap, importMap, listMaps, saveMap } from './storage';
+import { startAutoBackup } from './backup';
+import { esc } from './dialogs';
+import { backupDialog, importDialog } from './panels';
+import { deleteMap, getMap, listMaps, saveMap } from './storage';
 
 const app = document.getElementById('app')!;
 let editor: Editor | null = null;
@@ -20,10 +23,6 @@ function showEditor(map: MindMap) {
   editor = new Editor(app, map, saveMap, () => {
     location.hash = '#/';
   });
-}
-
-function esc(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 }
 
 function showList() {
@@ -50,7 +49,10 @@ function showList() {
           .join('')}
       </ul>
       ${maps.length ? '' : '<p class="muted">Noch keine Mindmaps – lege oben die erste an.</p>'}
-      <label class="btn import">⤒ Importieren<input type="file" accept=".json,application/json" hidden></label>
+      <div class="row">
+        <button class="btn" data-import>⤒ Importieren (Datei, Text, Screenshot)</button>
+        <button class="btn" data-backup>💾 Backup &amp; Wiederherstellen</button>
+      </div>
     </main>`;
 
   app.querySelector<HTMLFormElement>('form.new')!.addEventListener('submit', (e) => {
@@ -69,18 +71,16 @@ function showList() {
       }
     }),
   );
-  app.querySelector<HTMLInputElement>('input[type=file]')!.addEventListener('change', async (e) => {
-    const f = (e.target as HTMLInputElement).files?.[0];
-    if (!f) return;
-    try {
-      const map = importMap(await f.text());
-      location.hash = `#/m/${encodeURIComponent(map.id)}`;
-    } catch (err) {
-      alert('Import fehlgeschlagen: ' + (err as Error).message);
-    }
-  });
+  app.querySelector('[data-import]')!.addEventListener('click', () =>
+    importDialog((id) => {
+      if (id) location.hash = `#/m/${encodeURIComponent(id)}`;
+      else showList();
+    }),
+  );
+  app.querySelector('[data-backup]')!.addEventListener('click', () => backupDialog(showList));
 }
 
+startAutoBackup();
 window.addEventListener('hashchange', route);
 route();
 

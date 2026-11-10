@@ -1,7 +1,8 @@
 import * as M from './model';
 import type { DropMode, MindMap, NodeType } from './model';
 import { type Box, boundsOf, displayText, layoutMap } from './layout';
-import { exportMap } from './storage';
+import { applyParsed, parseOutline } from './outline';
+import { shareDialog } from './panels';
 
 const NS = 'http://www.w3.org/2000/svg';
 const HUES = [210, 150, 28, 280, 350, 180, 52, 320];
@@ -104,7 +105,7 @@ export class Editor {
         <button class="btn icon" data-act="redo" title="Wiederholen (Strg+Y)" aria-label="Wiederholen">↷</button>
         <button class="btn" data-act="layout" title="Layout wechseln"></button>
         <button class="btn icon" data-act="fit" title="Alles anzeigen" aria-label="Alles anzeigen">⤢</button>
-        <button class="btn icon" data-act="export" title="Exportieren" aria-label="Exportieren">⤓</button>
+        <button class="btn icon" data-act="export" title="Export &amp; KI" aria-label="Export und KI">⇅</button>
       </header>
       <div class="stage">
         <svg class="canvas" xmlns="${NS}">
@@ -152,7 +153,7 @@ export class Editor {
         case 'undo': return this.undo();
         case 'redo': return this.redo();
         case 'fit': return this.fit();
-        case 'export': return exportMap(this.map);
+        case 'export': return shareDialog(() => this.map, (t) => this.applyOutlineText(t));
         case 'layout':
           return this.commit((m) => (m.layout = m.layout === 'radial' ? 'tree' : 'radial'), true);
         case 'free': return this.addFreeNode();
@@ -287,6 +288,15 @@ export class Editor {
       const id = this.sel;
       this.commit((m) => M.setType(m, id, t));
     }
+  }
+
+  /** Ersetzt den Inhalt der Mindmap durch eine Gliederung (z. B. Antwort einer KI). */
+  private applyOutlineText(text: string) {
+    const parsed = parseOutline(text);
+    this.sel = null;
+    this.commit((m) => applyParsed(m, parsed), true);
+    const t = this.root.querySelector<HTMLInputElement>('input.title');
+    if (t) t.value = this.map.title;
   }
 
   // ───────────────────────── Zeichnen ─────────────────────────
