@@ -1,5 +1,5 @@
 export type NodeType = 'none' | 'checkbox' | 'info';
-export type LayoutMode = 'radial' | 'tree';
+export type LayoutMode = 'sides' | 'tree' | 'radial';
 export type DropMode = 'child' | 'before' | 'after';
 
 export interface MindNode {
@@ -13,6 +13,12 @@ export interface MindNode {
   /** Nur bei Wurzelknoten (parent === null): Position auf der Zeichenfläche. */
   x?: number;
   y?: number;
+  /**
+   * Nur bei Knoten mit Elternknoten: manuelle grafische Verschiebung gegenüber der automatischen
+   * Position. Sie gilt auch für den ganzen Teilbaum. Die Beziehung zum Elternknoten bleibt unverändert.
+   */
+  dx?: number;
+  dy?: number;
 }
 
 export interface MindMap {
@@ -34,7 +40,7 @@ export function createMap(title: string): MindMap {
   const map: MindMap = {
     id: newId(),
     title,
-    layout: 'radial',
+    layout: 'sides',
     nodes: {},
     roots: [],
     updatedAt: Date.now(),
@@ -116,6 +122,35 @@ export function isInSubtree(map: MindMap, id: string, ancestorId: string): boole
   return false;
 }
 
+/** Verschiebt einen Knoten (samt Teilbaum) nur grafisch; die Beziehungen bleiben bestehen. */
+export function shiftNode(map: MindMap, id: string, ddx: number, ddy: number): void {
+  const n = map.nodes[id];
+  if (n.parent === null) {
+    n.x = (n.x ?? 0) + ddx;
+    n.y = (n.y ?? 0) + ddy;
+  } else {
+    n.dx = (n.dx ?? 0) + ddx;
+    n.dy = (n.dy ?? 0) + ddy;
+  }
+}
+
+export function hasOffset(map: MindMap, id: string): boolean {
+  const n = map.nodes[id];
+  return !!(n && (n.dx || n.dy));
+}
+
+export function resetOffset(map: MindMap, id: string): void {
+  delete map.nodes[id].dx;
+  delete map.nodes[id].dy;
+}
+
+export function resetAllOffsets(map: MindMap): void {
+  for (const n of Object.values(map.nodes)) {
+    delete n.dx;
+    delete n.dy;
+  }
+}
+
 export function canMove(map: MindMap, id: string, targetId: string, mode: DropMode): boolean {
   if (!map.nodes[id] || !map.nodes[targetId]) return false;
   if (isInSubtree(map, targetId, id)) return false; // nicht in sich selbst / den eigenen Teilbaum
@@ -138,10 +173,15 @@ function unlink(map: MindMap, id: string): void {
 export function moveNode(map: MindMap, id: string, targetId: string, mode: DropMode): boolean {
   if (!canMove(map, id, targetId, mode)) return false;
   const node = map.nodes[id];
+  const target = map.nodes[targetId];
+  if (mode === 'child' && node.parent === targetId) {
+    resetOffset(map, id); // schon dort: nur wieder an den automatischen Platz andocken
+    return true;
+  }
   unlink(map, id);
   delete node.x;
   delete node.y;
-  const target = map.nodes[targetId];
+  resetOffset(map, id);
   if (mode === 'child') {
     target.children.push(id);
     node.parent = targetId;
@@ -164,6 +204,7 @@ export function detachToFree(map: MindMap, id: string, x: number, y: number): vo
   }
   node.x = x;
   node.y = y;
+  resetOffset(map, id);
 }
 
 /**
@@ -234,6 +275,8 @@ export function sanitizeMap(raw: unknown): MindMap {
       children: Array.isArray(x.children) ? x.children.filter((c) => typeof c === 'string' && c in r.nodes!) : [],
       ...(typeof x.x === 'number' ? { x: x.x } : {}),
       ...(typeof x.y === 'number' ? { y: x.y } : {}),
+      ...(typeof x.dx === 'number' ? { dx: x.dx } : {}),
+      ...(typeof x.dy === 'number' ? { dy: x.dy } : {}),
     };
   }
   // Zyklen in der Elternkette auflösen
@@ -257,7 +300,7 @@ export function sanitizeMap(raw: unknown): MindMap {
   return {
     id: typeof r.id === 'string' ? r.id : newId(),
     title: String(r.title ?? 'Importiert'),
-    layout: r.layout === 'tree' ? 'tree' : 'radial',
+    layout: r.layout === 'tree' || r.layout === 'radial' ? r.layout : 'sides',
     nodes,
     roots,
     updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : Date.now(),

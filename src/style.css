@@ -16,6 +16,15 @@
   --root-text: #fff;
   --canvas: #fbfcfe;
   --grid: #e8edf3;
+  /* Darstellung der Mindmap: helle Mint-Knoten auf Schiefer */
+  --map-bg: #607479;
+  --map-line: #eaf6f2;
+  --map-text: #1c2c2a;
+  --n-root: #d4f4ea;
+  --n-1: #e2f9f2;
+  --n-2: #c3e5da;
+  --n-3: #b5d9ce;
+  --drop: #ffcf5c;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -111,13 +120,8 @@ body {
 }
 .title:hover, .title:focus { border-color: var(--line); background: var(--bg); outline: none; }
 
-.stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--canvas); }
-.canvas {
-  width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none;
-  background-image: radial-gradient(var(--grid) 1.2px, transparent 1.2px);
-  background-size: 24px 24px;
-  cursor: grab;
-}
+.stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--map-bg); }
+.canvas { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
 .fab {
   position: absolute; right: 12px; top: 12px; min-height: 40px; padding: 0 14px; border-radius: 20px;
   border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; cursor: pointer;
@@ -127,46 +131,44 @@ body {
 .empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; color: var(--muted); pointer-events: none; }
 .inline-edit {
   position: absolute; z-index: 5; font: inherit; text-align: center; padding: 0 12px;
-  border: 2px solid var(--accent); border-radius: 999px; background: var(--panel); color: var(--text); outline: none;
+  border: 2px solid var(--drop); border-radius: 6px; background: #fff; color: #1c2c2a; color: var(--text); outline: none;
   box-shadow: 0 4px 16px rgba(0,0,0,.2);
 }
 .inline-edit[hidden], .empty[hidden] { display: none; }
 
 /* ── Knoten ── */
-.node { cursor: pointer; --h: 215; }
-.node .body {
-  fill: hsl(var(--h) var(--node-s) var(--node-l));
-  stroke: hsl(var(--h) 50% var(--node-stroke-l));
-  stroke-width: 1.5;
-}
-.node.root .body { fill: var(--root-fill); stroke: var(--root-fill); }
-.node .label { fill: var(--text); font-size: 14px; pointer-events: none; }
-.node.root .label { fill: var(--root-text); font-weight: 600; font-size: 16px; }
+.node { cursor: pointer; }
+.node .body { fill: var(--n-2); stroke: none; }
+.node.d1 .body { fill: var(--n-1); }
+.node.d2 .body { fill: var(--n-2); }
+.node.root .body { fill: var(--n-root); stroke: #8fa19d; stroke-width: 1.5; }
+.node .label { fill: var(--map-text); pointer-events: none; }
+.node.root .label { font-weight: 600; }
 .node .label.placeholder { opacity: .5; }
-.node.selected .body { stroke: var(--accent); stroke-width: 3.5; }
+.node.selected .body { stroke: var(--drop); stroke-width: 3.5; }
 .node.dim, .edge.dim { opacity: .3; }
-.node.done .body { stroke: var(--ok); }
-.node .chk .box { fill: var(--panel); stroke: var(--muted); stroke-width: 1.8; }
-.node.done .chk .box { fill: var(--ok); stroke: var(--ok); }
+.node.done .body { stroke: var(--ok); stroke-width: 2; }
+.node.done.selected .body { stroke: var(--drop); stroke-width: 3.5; }
+.node .chk .box { fill: #fff; stroke: #5b6f6b; stroke-width: 1.6; }
+.node.done .chk .box { fill: #2f855a; stroke: #2f855a; }
 .node .chk .tick { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .node .chk.derived .box { stroke-dasharray: 3 2.5; }
-.node.root .chk .box { stroke: #cbd5e1; }
-.node .info-dot { fill: var(--accent); }
-.node .info-i { fill: #fff; font: italic 700 13px Georgia, serif; pointer-events: none; }
-.edge { fill: none; stroke-linecap: round; }
+.node .info-dot { fill: #2b6cb0; }
+.node .info-i { fill: #fff; font: italic 700 12px Georgia, serif; pointer-events: none; }
+.edge { fill: none; stroke: var(--map-line); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ── Drag-Visualisierung ── */
 .ghost { opacity: .85; pointer-events: none; filter: drop-shadow(0 6px 10px rgba(0,0,0,.3)); }
 .ghost.invalid { opacity: .45; }
-.drop-hl { fill: none; stroke: var(--accent); stroke-width: 3; stroke-dasharray: 7 5; pointer-events: none; }
-.drop-bar { stroke: var(--accent); stroke-width: 5; stroke-linecap: round; pointer-events: none; }
-.drop-link { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 8 6; stroke-linecap: round; pointer-events: none; }
-.drop-dot { fill: var(--accent); pointer-events: none; }
+.drop-hl { fill: none; stroke: var(--drop); stroke-width: 3; stroke-dasharray: 7 5; pointer-events: none; }
+.drop-bar { stroke: var(--drop); stroke-width: 5; stroke-linecap: round; pointer-events: none; }
+.drop-link { stroke: var(--drop); stroke-width: 3; stroke-dasharray: 8 6; stroke-linecap: round; pointer-events: none; }
+.drop-dot { fill: var(--drop); pointer-events: none; }
 .drop-label { pointer-events: none; }
-.drop-label rect { fill: var(--accent); }
-.drop-label text { fill: #fff; font-size: 12px; }
-.badge circle { fill: var(--accent); stroke: #fff; stroke-width: 2; }
-.badge text { fill: #fff; font-size: 11px; font-weight: 700; }
+.drop-label rect { fill: var(--drop); }
+.drop-label text { fill: #2a2100; font-size: 12px; font-weight: 600; }
+.badge circle { fill: var(--drop); stroke: #fff; stroke-width: 2; }
+.badge text { fill: #2a2100; font-size: 11px; font-weight: 700; }
 
 @media (max-width: 640px) {
   .topbar .lbl { display: none; }
@@ -210,3 +212,6 @@ kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4p
 .note-list span { overflow-wrap: anywhere; }
 .note-list li.done span { text-decoration: line-through; color: var(--muted); }
 .version { margin-top: auto; padding-top: 32px; text-align: center; color: var(--muted); font-size: 12px; }
+.node.preview .body { stroke: var(--drop); stroke-width: 3; stroke-dasharray: 6 4; }
+.edge.preview { stroke-dasharray: 8 6; }
+.ghost.docking { opacity: .5; }

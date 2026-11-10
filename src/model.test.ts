@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addChild, addFree, addSibling, canMove, computeDone, createMap, deleteNode,
+  addChild, addFree, hasOffset, resetOffset, shiftNode, addSibling, canMove, computeDone, createMap, deleteNode,
   detachToFree, isDerived, moveNode, sanitizeMap, setType, toggleDone,
 } from './model';
 
@@ -127,5 +127,36 @@ describe('Import', () => {
     copy.nodes[ids[2]].parent = ids[1]; // Zyklus
     const fixed = sanitizeMap(copy);
     expect(fixed.roots.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Grafisches Verschieben', () => {
+  it('shiftNode ändert nur die Darstellung, nicht die Beziehungen', () => {
+    const { m, root, a } = setup();
+    shiftNode(m, a, 30, -20);
+    shiftNode(m, a, 5, 5);
+    expect(m.nodes[a]).toMatchObject({ dx: 35, dy: -15, parent: root });
+    expect(hasOffset(m, a)).toBe(true);
+    resetOffset(m, a);
+    expect(hasOffset(m, a)).toBe(false);
+  });
+
+  it('Wurzelknoten verschieben ihre Position', () => {
+    const { m, root } = setup();
+    shiftNode(m, root, 10, 20);
+    expect(m.nodes[root]).toMatchObject({ x: 10, y: 20 });
+  });
+
+  it('Andocken setzt die manuelle Position zurück; gleicher Elternknoten behält die Reihenfolge', () => {
+    const { m, root, a, b, a1 } = setup();
+    shiftNode(m, b, 100, 100);
+    moveNode(m, b, a, 'child');
+    expect(hasOffset(m, b)).toBe(false);
+    shiftNode(m, a1, 7, 7);
+    const order = [...m.nodes[a].children];
+    expect(moveNode(m, a1, a, 'child')).toBe(true);
+    expect(m.nodes[a].children).toEqual(order);
+    expect(hasOffset(m, a1)).toBe(false);
+    expect(m.nodes[root].children).toEqual([a]);
   });
 });

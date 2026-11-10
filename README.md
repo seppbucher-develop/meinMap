@@ -9,14 +9,19 @@ nutzen und als App installieren lässt. Alle Daten bleiben lokal im Gerät.
 - Knoten auf gleicher Ebene (Geschwister) und untergeordnet (Unterknoten) anlegen
 - **Freie Knoten**: Knoten ohne Verbindung, die später angehängt werden können
 - Knotentext bearbeiten (Doppelklick/Doppeltipp, `F2` oder „✎ Text“)
-- **Umhängen per Maus oder Finger** (Handy: Knoten lange gedrückt halten, dann ziehen).
-  Während des Ziehens wird die neue Verbindung angezeigt:
-  - Mitte des Zielknotens → wird **Unterknoten** (Rahmen + gestrichelte Linie)
-  - oberer/unterer Rand → wird **Geschwister davor/danach** (Einfügebalken)
-  - leere Fläche → wird **freier Knoten**
-  - Zyklen (in den eigenen Teilbaum) sind nicht möglich
+- **Verschieben per Maus oder Finger** (Handy: Knoten lange gedrückt halten, dann ziehen):
+  - Das Ziehen dient der grafischen Gestaltung: Der Knoten (mit seinem Teilbaum) wird nur neu **positioniert**,
+    die Beziehung zum Elternknoten bleibt bestehen („↺ Position“ setzt ihn an den automatischen Platz zurück).
+  - **Andocken** passiert nur, wenn die Mitte des gezogenen Knotens deutlich über einem anderen Knoten liegt.
+    Bis zum Loslassen wird die neue Anordnung simuliert (Vorschau mit gestricheltem Rahmen und Label):
+    Mitte des Zielknotens → **Unterknoten**, oberer/unterer Rand → **Geschwister davor/danach**.
+  - Freie Knoten (ohne Eltern) lassen sich überall hin ziehen oder auf einen Knoten ziehen, um sie anzuhängen.
+    Über „⛓ Lösen“ wird ein Knoten gezielt vom Elternknoten gelöst.
+  - Zyklen (in den eigenen Teilbaum) sind nicht möglich. Beim Wechsel des Layouts werden manuelle Positionen zurückgesetzt.
 - Knotentyp: **Kein**, **Aufgabe** (Checkbox) oder **Info**
-- Layout: **Radial** (um die Wurzel herum) oder **Baum** (von links nach rechts)
+- Darstellung: helle Mint-Knoten auf Schiefer-Hintergrund, Hauptäste als weiche Bögen, tiefere Ebenen mit Klammer-Verbindern;
+  lange Texte brechen automatisch mehrzeilig um
+- Layout: **Beidseitig** (Standard, links und rechts der Wurzel), **Baum** (nur nach rechts) oder **Radial** (ringförmig um die Wurzel)
 - Rückgängig/Wiederholen, Zoom (Mausrad, Pinch), Verschieben der Fläche
 
 ### Import, Export, KI
