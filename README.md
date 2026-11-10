@@ -19,7 +19,9 @@ nutzen und als App installieren lässt. Alle Daten bleiben lokal im Gerät.
     Über „⛓ Lösen“ wird ein Knoten gezielt vom Elternknoten gelöst.
   - Zyklen (in den eigenen Teilbaum) sind nicht möglich. Beim Wechsel des Layouts werden manuelle Positionen zurückgesetzt.
 - Knotentyp: **Kein**, **Aufgabe** (Checkbox) oder **Info**
-- Layout: **Radial** (um die Wurzel herum) oder **Baum** (von links nach rechts)
+- Darstellung: helle Mint-Knoten auf Schiefer-Hintergrund, Hauptäste als weiche Bögen, tiefere Ebenen mit Klammer-Verbindern;
+  lange Texte brechen automatisch mehrzeilig um
+- Layout: **Beidseitig** (Standard, links und rechts der Wurzel), **Baum** (nur nach rechts) oder **Radial** (ringförmig um die Wurzel)
 - Rückgängig/Wiederholen, Zoom (Mausrad, Pinch), Verschieben der Fläche
 
 ### Import, Export, KI

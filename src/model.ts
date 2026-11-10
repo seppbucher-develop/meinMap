@@ -1,5 +1,5 @@
 export type NodeType = 'none' | 'checkbox' | 'info';
-export type LayoutMode = 'radial' | 'tree';
+export type LayoutMode = 'sides' | 'tree' | 'radial';
 export type DropMode = 'child' | 'before' | 'after';
 
 export interface MindNode {
@@ -40,7 +40,7 @@ export function createMap(title: string): MindMap {
   const map: MindMap = {
     id: newId(),
     title,
-    layout: 'radial',
+    layout: 'sides',
     nodes: {},
     roots: [],
     updatedAt: Date.now(),
@@ -300,7 +300,7 @@ export function sanitizeMap(raw: unknown): MindMap {
   return {
     id: typeof r.id === 'string' ? r.id : newId(),
     title: String(r.title ?? 'Importiert'),
-    layout: r.layout === 'tree' ? 'tree' : 'radial',
+    layout: r.layout === 'tree' || r.layout === 'radial' ? r.layout : 'sides',
     nodes,
     roots,
     updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : Date.now(),

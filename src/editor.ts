@@ -1,11 +1,10 @@
 import * as M from './model';
 import type { DropMode, MindMap, NodeType } from './model';
-import { type Box, boundsOf, displayText, layoutMap } from './layout';
+import { type Box, boundsOf, layoutMap } from './layout';
 import { applyParsed, parseOutline } from './outline';
 import { shareDialog } from './panels';
 
 const NS = 'http://www.w3.org/2000/svg';
-const HUES = [210, 150, 28, 280, 350, 180, 52, 320];
 const DRAG_THRESHOLD = 5; // px
 const LONG_PRESS_MS = 380;
 const DOUBLE_TAP_MS = 350;
@@ -161,7 +160,7 @@ export class Editor {
         case 'export': return shareDialog(() => this.map, (t) => this.applyOutlineText(t));
         case 'layout':
           return this.commit((m) => {
-            m.layout = m.layout === 'radial' ? 'tree' : 'radial';
+            m.layout = m.layout === 'sides' ? 'tree' : m.layout === 'tree' ? 'radial' : 'sides';
             M.resetAllOffsets(m); // manuelle Positionen gelten nur für das jeweilige Layout
           }, true);
         case 'resetpos': return this.sel && this.commit((m) => M.resetOffset(m, this.sel!));
@@ -329,21 +328,29 @@ export class Editor {
     if (this.drag) this.drawOverlay();
   }
 
-  private hue(b: Box): number | null {
-    return b.branch < 0 ? null : HUES[b.branch % HUES.length];
-  }
-
   private drawEdge(pid: string, cid: string, dim: boolean) {
     const p = this.boxes[pid];
     const c = this.boxes[cid];
-    const h = this.hue(c);
-    const color = h === null ? 'var(--edge)' : `hsl(${h} 55% 52%)`;
+    const previewing = this.drag?.target?.kind === 'node' && this.drag.id === cid;
     let d: string;
-    if (this.map.layout === 'tree') {
-      const x1 = p.x + p.w / 2;
-      const x2 = c.x - c.w / 2;
-      const mx = (x1 + x2) / 2;
-      d = `M${x1} ${p.y} C${mx} ${p.y} ${mx} ${c.y} ${x2} ${c.y}`;
+    const dir = c.x >= p.x ? 1 : -1;
+    const px = p.x + dir * (p.w / 2);
+    const cx = c.x - dir * (c.w / 2);
+    const room = dir * (cx - px);
+    if (this.map.layout !== 'radial' && room >= 14) {
+      if (p.depth === 0) {
+        // Hauptäste: weicher S-Bogen von der Wurzel
+        const mx = (px + cx) / 2;
+        d = `M${px} ${p.y} C${mx} ${p.y} ${mx} ${c.y} ${cx} ${c.y}`;
+      } else {
+        // weitere Ebenen: Klammer mit abgerundeten Ecken, Rückgrat kurz vor den Kindern
+        const jx = cx - dir * Math.min(12, room / 2);
+        const sy = c.y > p.y ? 1 : -1;
+        const r = Math.min(8, Math.abs(c.y - p.y) / 2, Math.abs(jx - px));
+        d = Math.abs(c.y - p.y) < 2
+          ? `M${px} ${p.y} L${cx} ${c.y}`
+          : `M${px} ${p.y} H${jx - dir * r} Q${jx} ${p.y} ${jx} ${p.y + sy * r} V${c.y - sy * r} Q${jx} ${c.y} ${jx + dir * r} ${c.y} H${cx}`;
+      }
     } else {
       const dx = c.x - p.x;
       const dy = c.y - p.y;
@@ -356,12 +363,9 @@ export class Editor {
       if (ul < 1) { ux = dx / len; uy = dy / len; } else { ux /= ul; uy /= ul; }
       d = `M${p.x} ${p.y} Q${p.x + ux * len * 0.4} ${p.y + uy * len * 0.4} ${c.x} ${c.y}`;
     }
-    const previewing = this.drag?.target?.kind === 'node' && this.drag.id === cid;
     svg('path', {
       d,
       class: 'edge' + (dim ? ' dim' : '') + (previewing ? ' preview' : ''),
-      stroke: color,
-      'stroke-width': Math.max(1.8, 4.5 - c.depth),
     }, this.gEdges);
   }
 
@@ -374,10 +378,9 @@ export class Editor {
   private drawNode(id: string, dim: boolean, into: Element = this.gNodes, at?: { x: number; y: number }) {
     const n = this.map.nodes[id];
     const b = this.boxes[id];
-    const h = this.hue(b);
     const done = this.done[id];
     const isRoot = n.parent === null;
-    const cls = ['node'];
+    const cls = ['node', 'd' + Math.min(b.depth, 2)];
     if (isRoot) cls.push('root');
     if (id === this.sel && into === this.gNodes) cls.push('selected');
     if (dim) cls.push('dim');
@@ -389,30 +392,33 @@ export class Editor {
       class: cls.join(' '),
       'data-id': id,
       transform: `translate(${cx - b.w / 2} ${cy - b.h / 2})`,
-      style: h === null ? '' : `--h:${h}`,
     }, into);
-    svg('rect', { class: 'body', width: b.w, height: b.h, rx: b.h / 2 }, g);
+    svg('rect', { class: 'body', width: b.w, height: b.h, rx: isRoot ? 7 : 4 }, g);
 
     const hasIcon = n.type !== 'none';
+    const iconY = b.padY + b.lh / 2; // Icon sitzt auf Höhe der ersten Zeile
     if (n.type === 'checkbox') {
       const derived = M.isDerived(this.map, id);
+      const bx = b.padX;
       const cg = svg('g', { class: 'chk' + (derived ? ' derived' : ''), 'data-chk': 1 }, g);
-      svg('rect', { class: 'hit', x: 2, y: 0, width: 34, height: b.h, fill: 'transparent' }, cg);
-      svg('rect', { class: 'box', x: 11, y: b.h / 2 - 8, width: 16, height: 16, rx: 4 }, cg);
-      if (done) svg('path', { class: 'tick', d: `M14.5 ${b.h / 2} l3.5 3.8 l6.5 -7.6` }, cg);
+      svg('rect', { class: 'hit', x: 0, y: 0, width: b.padX + 26, height: Math.min(b.h, 44), fill: 'transparent' }, cg);
+      svg('rect', { class: 'box', x: bx, y: iconY - 8, width: 16, height: 16, rx: 3 }, cg);
+      if (done) svg('path', { class: 'tick', d: `M${bx + 3.5} ${iconY} l3.5 3.8 l6.5 -7.6` }, cg);
     } else if (n.type === 'info') {
-      svg('circle', { class: 'info-dot', cx: 20, cy: b.h / 2, r: 9 }, g);
-      const t = svg('text', { class: 'info-i', x: 20, y: b.h / 2 + 0.5, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, g);
+      svg('circle', { class: 'info-dot', cx: b.padX + 8, cy: iconY, r: 8.5 }, g);
+      const t = svg('text', { class: 'info-i', x: b.padX + 8, y: iconY + 0.5, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, g);
       t.textContent = 'i';
     }
+    const textX = isRoot && !hasIcon ? b.w / 2 : b.padX + (hasIcon ? 26 : 0);
     const t = svg('text', {
       class: 'label' + (n.text.trim() ? '' : ' placeholder'),
-      x: hasIcon ? 36 : b.w / 2,
-      y: b.h / 2 + 0.5,
-      'text-anchor': hasIcon ? 'start' : 'middle',
-      'dominant-baseline': 'central',
+      'font-size': b.fs,
+      'text-anchor': isRoot && !hasIcon ? 'middle' : 'start',
     }, g);
-    t.textContent = displayText(n.text);
+    b.lines.forEach((line, i) => {
+      const ts = svg('tspan', { x: textX, y: b.padY + b.lh * (i + 0.5), 'dominant-baseline': 'central' }, t);
+      ts.textContent = line;
+    });
   }
 
   private updateToolbar() {
@@ -426,7 +432,8 @@ export class Editor {
       if (b.dataset.type) b.classList.toggle('active', node?.type === b.dataset.type);
     });
     const layoutBtn = this.root.querySelector<HTMLButtonElement>('[data-act="layout"]')!;
-    layoutBtn.innerHTML = this.map.layout === 'radial' ? '◎<span class="lbl"> Radial</span>' : '☰<span class="lbl"> Baum</span>';
+    const lbl = { sides: ['⇆', 'Beidseitig'], tree: ['☰', 'Baum'], radial: ['◎', 'Radial'] }[this.map.layout];
+    layoutBtn.innerHTML = `${lbl[0]}<span class="lbl"> ${lbl[1]}</span>`;
     (this.root.querySelector('[data-act="undo"]') as HTMLButtonElement).disabled = !this.undoStack.length;
     (this.root.querySelector('[data-act="redo"]') as HTMLButtonElement).disabled = !this.redoStack.length;
     this.empty.hidden = Object.keys(this.map.nodes).length > 0;
@@ -799,7 +806,7 @@ export class Editor {
     if (t?.kind === 'node') {
       const tb = this.boxes[t.id];
       const tn = this.map.nodes[t.id];
-      const tname = displayText(tn.text);
+      const tname = tn.text.trim().length > 24 ? tn.text.trim().slice(0, 23) + '…' : tn.text.trim() || '…';
       const mb = this.boxes[d.id]; // Position des angedockten Knotens in der Vorschau
       svg('rect', {
         class: 'drop-hl', x: tb.x - tb.w / 2 - 5, y: tb.y - tb.h / 2 - 5,
